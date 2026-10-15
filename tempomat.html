@@ -1,0 +1,637 @@
+<title>Tepový tempomat</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: konzole pro tablet na pásu – vlevo tep a cíl, vpravo pás, pod tím graf, nastavení a deník */
+:root{
+  --bg:#0e1517; --panel:#162024; --panel2:#1c282d; --line:#2a3a40; --fg:#e7eef0; --muted:#8a9da4;
+  --hr:#ff5266; --target:#3cc6c4; --speed:#f3a93c; --ok:#5cd38a; --warn:#f3c13c;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif; --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#eef3f4; --panel:#ffffff; --panel2:#f5f8f9; --line:#d3dde0; --fg:#0f1a1d; --muted:#57696f;
+  --hr:#d2283f; --target:#0d8987; --speed:#b26a00; --ok:#1e8f4f; --warn:#a87900; color-scheme:light } }
+:root[data-theme="light"]{
+  --bg:#eef3f4; --panel:#ffffff; --panel2:#f5f8f9; --line:#d3dde0; --fg:#0f1a1d; --muted:#57696f;
+  --hr:#d2283f; --target:#0d8987; --speed:#b26a00; --ok:#1e8f4f; --warn:#a87900; color-scheme:light }
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;line-height:1.45;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 28px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums;line-height:.9}
+.lbl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+h1{font-family:var(--display);font-weight:700;font-size:28px;margin:0;letter-spacing:.01em}
+.conn{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.chip.on .dot{background:var(--ok)} .chip.on{color:var(--fg)}
+button,select,input{font:inherit;color:var(--fg)}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer;min-height:44px}
+button:hover{border-color:var(--muted)} button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--target);outline-offset:2px}
+.btn-go{background:var(--ok);border-color:var(--ok);color:#06210f}
+.btn-stop{background:var(--hr);border-color:var(--hr);color:#fff;font-size:18px;min-width:120px}
+.main{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+@media (max-width:760px){.main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.hrbox{display:grid;grid-template-columns:auto 1fr;gap:6px 20px;align-items:end}
+.hrval{font-size:clamp(84px,14vw,150px);font-weight:700;color:var(--hr)}
+.hrunit{font-family:var(--display);font-size:22px;color:var(--muted);margin-left:4px}
+.trend{font-family:var(--display);font-size:26px;color:var(--muted)}
+.tgt{display:flex;align-items:center;gap:10px}
+.tgt .num{font-size:64px;font-weight:600;color:var(--target);min-width:2.2ch;text-align:center}
+.tgt button{width:56px;height:56px;font-size:28px;padding:0;border-radius:50%}
+.zone{position:relative;height:14px;border-radius:7px;background:var(--panel2);margin-top:14px;overflow:hidden}
+.zone .band{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--target) 35%,transparent)}
+.zone .mark{position:absolute;top:-2px;bottom:-2px;width:4px;border-radius:2px;background:var(--hr);transform:translateX(-2px)}
+.zone .max{position:absolute;top:0;bottom:0;right:0;background:color-mix(in srgb,var(--hr) 22%,transparent)}
+.zscale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:4px}
+.status{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{padding:5px 12px;border-radius:999px;font-weight:600;font-size:14px;background:var(--panel2);border:1px solid var(--line)}
+.pill.reg{border-color:var(--target);color:var(--target)} .pill.warn{border-color:var(--warn);color:var(--warn)} .pill.bad{border-color:var(--hr);color:var(--hr)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{background:var(--panel2);border-radius:12px;padding:12px 14px;min-width:0}
+.tile .num{font-size:58px;font-weight:600}
+.tile .sub{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.tile.sp .num{color:var(--speed)}
+.small .num{font-size:34px}
+.manual{display:flex;gap:6px;margin-top:8px} .manual button{flex:1;padding:6px;min-height:40px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.chartwrap{position:relative;height:240px}
+canvas{display:block;width:100%;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-bottom:8px;align-items:center}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.demo{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--panel2);color:var(--warn);border:1px solid var(--line)}
+details summary{cursor:pointer;font-weight:600;font-family:var(--display);font-size:20px;list-style-position:outside}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 18px;margin-top:14px}
+.form label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.form input,.form select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:42px;width:100%}
+.hint{font-size:13px;color:var(--muted);max-width:70ch;margin:10px 0 0}
+.log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);max-height:180px;overflow:auto;white-space:pre-wrap;margin-top:10px;background:var(--panel2);border-radius:8px;padding:10px}
+.msg{padding:10px 14px;border-radius:10px;border:1px solid var(--warn);color:var(--fg);background:color-mix(in srgb,var(--warn) 12%,var(--panel))}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="wrap">
+<header>
+  <h1>Tepový tempomat</h1>
+  <div class="conn">
+    <span class="chip" id="chipTm"><span class="dot"></span><span id="chipTmTxt">Pás nepřipojen</span></span>
+    <span class="chip" id="chipHr"><span class="dot"></span><span id="chipHrTxt">Tep: zdroj nepřipojen</span></span>
+  </div>
+</header>
+
+<div class="msg" id="msg" hidden></div>
+
+<div class="controls" style="margin-top:0">
+  <button id="btnTm">Připojit pás</button>
+  <button id="btnTmAll" title="Když se pás v seznamu neukáže">Hledat všechna zařízení</button>
+  <button id="btnHr">Připojit hrudní pás zvlášť</button>
+  <button id="btnSim">Simulace bez pásu</button>
+</div>
+
+<div class="main">
+  <section class="panel" aria-label="Tep">
+    <div class="hrbox">
+      <div class="lbl">Tep</div><div class="lbl">Cílový tep</div>
+      <div><span class="num hrval" id="hrVal">–</span><span class="hrunit">bpm</span><div class="trend" id="hrTrend">&nbsp;</div></div>
+      <div class="tgt">
+        <button id="tMinus" aria-label="Snížit cílový tep">−</button>
+        <span class="num" id="tVal">140</span>
+        <button id="tPlus" aria-label="Zvýšit cílový tep">+</button>
+      </div>
+    </div>
+    <div class="zone" id="zone"><div class="band" id="zBand"></div><div class="max" id="zMax"></div><div class="mark" id="zMark"></div></div>
+    <div class="zscale"><span>90</span><span>110</span><span>130</span><span>150</span><span>170</span><span>190</span></div>
+    <div class="status"><span class="pill" id="state">Připraveno</span><span class="pill" id="clock">0:00</span></div>
+  </section>
+
+  <section class="panel" aria-label="Pás">
+    <div class="tiles">
+      <div class="tile sp"><div class="lbl">Rychlost km/h</div><div class="num" id="vVal">–</div><div class="sub" id="vCmd">povel –</div>
+        <div class="manual"><button data-man="v-">−0,5</button><button data-man="v+">+0,5</button></div></div>
+      <div class="tile"><div class="lbl">Sklon %</div><div class="num" id="iVal">–</div><div class="sub" id="iCmd">povel –</div>
+        <div class="manual"><button data-man="i-">−1</button><button data-man="i+">+1</button></div></div>
+      <div class="tile small"><div class="lbl">Vzdálenost</div><div class="num" id="dVal">–</div><div class="sub">km</div></div>
+      <div class="tile small"><div class="lbl">Tempo</div><div class="num" id="pVal">–</div><div class="sub">min/km</div></div>
+    </div>
+    <div class="controls">
+      <button class="btn-go" id="btnStart" disabled>Start</button>
+      <button id="btnPause" disabled>Pauza</button>
+      <button class="btn-stop" id="btnStop" disabled>STOP</button>
+    </div>
+  </section>
+</div>
+
+<section class="panel" aria-label="Průběh">
+  <div class="legend"><span><i style="background:var(--hr)"></i>tep</span><span><i style="background:var(--target)"></i>cíl ±2</span><span><i style="background:var(--speed)"></i>rychlost</span><span><i style="background:var(--muted)"></i>sklon</span><span class="demo" id="demoTag">Ukázka ze simulace</span></div>
+  <div class="chartwrap"><canvas id="chart"></canvas></div>
+</section>
+
+<section class="panel">
+<details id="setDet">
+  <summary>Nastavení regulace</summary>
+  <div class="form">
+    <label>Režim<select id="s_mode">
+      <option value="mix">Rychlost, pak sklon</option>
+      <option value="speed">Jen rychlost (pevný sklon)</option>
+      <option value="incline">Jen sklon (chůze, pevná rychlost)</option></select></label>
+    <label>Reakce regulátoru<select id="s_response">
+      <option value="pomala">Pomalá – nejplynulejší</option>
+      <option value="stredni">Střední</option>
+      <option value="rychla">Rychlá</option></select></label>
+    <label>Max. tep – bezpečnost (bpm)<input id="s_hrMax" type="number" min="100" max="220" step="1"></label>
+    <label>Rozehřátí (min)<input id="s_warmup" type="number" min="0" max="20" step="0.5"></label>
+    <label>Rychlost na rozehřátí / chůze (km/h)<input id="s_vStart" type="number" min="1" max="15" step="0.1"></label>
+    <label>Min. rychlost (km/h)<input id="s_vMin" type="number" min="1" max="15" step="0.1"></label>
+    <label>Max. rychlost (km/h)<input id="s_vMax" type="number" min="2" max="22" step="0.1"></label>
+    <label>Základní sklon (%)<input id="s_iBase" type="number" min="-3" max="15" step="0.5"></label>
+    <label>Max. sklon (%)<input id="s_iMax" type="number" min="0" max="15" step="0.5"></label>
+    <label>Váha sklonu (km/h za 1 %)<input id="s_w" type="number" min="0.1" max="1.5" step="0.05"></label>
+  </div>
+  <p class="hint">Regulátor každých 5 s porovná cílový tep s tepem předpovězeným 15 s dopředu (srdce reaguje se zpožděním) a upraví „úsilí“ v ekvivalentních km/h. V pásmu ±2 bpm nic nemění. Zvyšuje nejvýš o 0,1–0,25 km/h za krok, snižuje rychleji. Při překročení max. tepu okamžitě zpomaluje, při výpadku tepu 30 s drží a pak zpomaluje. Když změníš rychlost nebo sklon ručně, regulátor to převezme jako nový výchozí stav.</p>
+</details>
+</section>
+
+<section class="panel">
+<details>
+  <summary>Deník komunikace</summary>
+  <div class="log" id="log"></div>
+</details>
+</section>
+</div>
+<script>
+/* Jádro: regulátor tepu + simulátor. Čisté funkce bez DOM. */
+const CORE = (() => {
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  // Odezva: lam = požadovaná časová konstanta uzavřené smyčky [s], up/down = max. změna "úsilí" za krok [km/h]
+  const RESP = {
+    pomala:  { lam: 110, up: 0.10, down: 0.30 },
+    stredni: { lam: 60,  up: 0.15, down: 0.40 },
+    rychla:  { lam: 40,  up: 0.25, down: 0.60 },
+  };
+  // Model srdce: zisk ~9 tepů na 1 km/h, časová konstanta ~45 s, dopravní zpoždění ~10 s
+  const G = 9, TAU = 45, THETA = 10, DT = 5, DEAD = 2, LOOKAHEAD = 15;
+
+  // "Úsilí" = ekvivalentní rychlost v km/h; 1 % sklonu = w km/h
+  function effortRange(c) {
+    if (c.mode === 'speed') return [c.vMin, c.vMax];
+    if (c.mode === 'mix') return [c.vMin, c.vMax + (c.iMax - c.iBase) * c.w];
+    return [c.vStart, c.vStart + (c.iMax - c.iBase) * c.w];
+  }
+  function mapEffort(x, c) {
+    if (c.mode === 'speed') return { v: x, i: c.iBase };
+    if (c.mode === 'mix') return { v: Math.min(x, c.vMax), i: c.iBase + Math.max(0, (x - c.vMax) / c.w) };
+    return { v: c.vStart, i: c.iBase + Math.max(0, (x - c.vStart) / c.w) };
+  }
+  function effortFrom(v, i, c) {
+    const di = Math.max(0, i - c.iBase) * c.w;
+    if (c.mode === 'speed') return v;
+    if (c.mode === 'mix') return v >= c.vMax - 0.05 ? v + di : v;
+    return c.vStart + di;
+  }
+
+  // Odhad tepu a trendu lineární regresí přes posledních 20 s
+  function estimate(samples, now) {
+    let n = 0, mt = 0, mh = 0, last = -Infinity;
+    for (const s of samples) if (now - s.t <= 20 && s.t <= now && s.hr > 30) { n++; mt += s.t; mh += s.hr; last = Math.max(last, s.t); }
+    if (n < 4 || now - last > 8) return null;
+    mt /= n; mh /= n;
+    let num = 0, den = 0;
+    for (const s of samples) if (now - s.t <= 20 && s.t <= now && s.hr > 30) { num += (s.t - mt) * (s.hr - mh); den += (s.t - mt) ** 2; }
+    const slope = den > 0 ? clamp(num / den, -1, 1) : 0;
+    return { hr: mh + slope * (now - mt), slope };
+  }
+
+  function ctlInit(c, t) {
+    return { effort: effortFrom(c.vStart, c.iBase, c), ePrev: null, phase: 'warm', phaseStart: t, lostAt: null };
+  }
+
+  // Jeden krok regulace (volat každých DT sekund). Vrací text stavu.
+  function ctlStep(st, c, est, t) {
+    const r = RESP[c.response] || RESP.stredni;
+    const [lo, hi] = effortRange(c);
+    if (!est) {
+      if (st.lostAt == null) st.lostAt = t;
+      st.ePrev = null;
+      if (t - st.lostAt > 30) { st.effort = clamp(st.effort - r.down, lo, hi); return 'Bez signálu tepu – zpomaluji'; }
+      return 'Bez signálu tepu – držím';
+    }
+    st.lostAt = null;
+    if (st.phase === 'warm') {
+      if (t - st.phaseStart >= c.warmup * 60 || est.hr >= c.target - 3) { st.phase = 'reg'; st.ePrev = null; }
+      else return 'Rozehřátí';
+    }
+    const Kc = TAU / (G * (r.lam + THETA)), Ki = Kc / TAU;
+    const pred = est.hr + est.slope * LOOKAHEAD;
+    let e = c.target - pred;
+    if (Math.abs(e) <= DEAD) e = 0;
+    let du = (st.ePrev == null ? 0 : Kc * (e - st.ePrev)) + Ki * e * DT;
+    st.ePrev = e;
+    let msg = 'Reguluji';
+    if (est.hr >= c.hrMax) { du = Math.min(du, -r.down); msg = 'Nad max. tepem – zpomaluji'; }
+    du = clamp(du, -r.down, r.up);
+    st.effort = clamp(st.effort + du, lo, hi);
+    if (st.effort >= hi - 1e-6 && e > 0) msg = 'Na maximu – cíl nejde dosáhnout';
+    if (st.effort <= lo + 1e-6 && e < 0) msg = 'Na minimu – tep je stále vysoko';
+    return msg;
+  }
+
+  // Simulátor běžce (pro ukázku a test bez pásu)
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function makeSim(seed = 7) { return { hr: 74, v: 0, i: 0, buf: [], drift: 0, r: rng(seed) }; }
+  function simTick(s, cmdV, cmdI) {
+    s.v += clamp(cmdV - s.v, -0.5, 0.5);
+    s.i += clamp(cmdI - s.i, -0.3, 0.3);
+    s.buf.push({ v: s.v, i: s.i });
+    const d = s.buf.length > 10 ? s.buf.shift() : s.buf[0];
+    if (d.v > 4) s.drift += 0.12 / 60;
+    const ss = 64 + (d.v > 0.5 ? 8.8 * d.v + 3.2 * d.i * (0.5 + d.v / 10) : 0) + s.drift;
+    s.hr += (ss - s.hr) / 45;
+    const noise = (s.r() + s.r() + s.r() - 1.5) * 1.6;
+    return Math.round(s.hr + noise);
+  }
+
+  return { clamp, RESP, DT, DEAD, effortRange, mapEffort, effortFrom, estimate, ctlInit, ctlStep, makeSim, simTick };
+})();
+if (typeof module !== 'undefined') module.exports = CORE;
+</script><script>
+(() => {
+const $ = id => document.getElementById(id);
+const C = CORE, clamp = C.clamp;
+const DEF = { target:140, hrMax:175, mode:'mix', response:'stredni', warmup:3, vStart:6, vMin:3.5, vMax:11, iBase:1, iMax:10, w:0.4 };
+let cfg = { ...DEF };
+try { Object.assign(cfg, JSON.parse(localStorage.getItem('tt_cfg') || '{}')); } catch (e) {}
+const saveCfg = () => { try { localStorage.setItem('tt_cfg', JSON.stringify(cfg)); } catch (e) {} };
+
+// ---------- stav ----------
+const nowS = () => performance.now() / 1000;
+let src = 'none';                 // none | sim | ble
+let samples = [];                 // {t, hr}
+let tm = { v:null, i:null, dist:null, hr:null, t:0 };
+let ext = { hr:null, t:0, dev:null };
+let ble = { dev:null, cp:null, pending:null, vRange:[0.5,20,0.1], iRange:[-3,15,1], wantConnected:false };
+let cpQueue = Promise.resolve();
+let sim = null, simCmd = { v:0, i:0 };
+let run = { on:false, paused:false, elapsed:0, ctl:null, lastCtl:0, msg:'Připraveno', lastSent:null, lastSentAt:0, lastIncAt:-99, overrideCnt:0, dist0:null };
+let hist = [], demo = true;
+let wake = null;
+
+// ---------- deník ----------
+const logEl = $('log');
+function log(s) {
+  const d = new Date(); const ts = d.toTimeString().slice(0,8);
+  logEl.textContent = `${ts}  ${s}\n` + logEl.textContent.slice(0, 6000);
+}
+function showMsg(s) { const m = $('msg'); m.textContent = s || ''; m.hidden = !s; }
+
+// ---------- nastavení ----------
+const keys = ['mode','response','hrMax','warmup','vStart','vMin','vMax','iBase','iMax','w'];
+function fillForm() { for (const k of keys) $('s_'+k).value = cfg[k]; $('tVal').textContent = cfg.target; }
+for (const k of keys) $('s_'+k).addEventListener('change', e => {
+  const v = e.target.value; cfg[k] = (k === 'mode' || k === 'response') ? v : parseFloat(String(v).replace(',', '.'));
+  if (!(cfg[k] === cfg[k])) cfg[k] = DEF[k];
+  if (cfg.vMin > cfg.vMax) cfg.vMin = cfg.vMax;
+  if (cfg.iBase > cfg.iMax) cfg.iBase = cfg.iMax;
+  saveCfg();
+  if (run.on && run.ctl && (k === 'mode')) { run.ctl.effort = C.effortFrom(tm.v ?? cfg.vStart, tm.i ?? cfg.iBase, cfg); run.ctl.ePrev = null; }
+  if (run.on && run.ctl) { const [lo,hi] = C.effortRange(cfg); run.ctl.effort = clamp(run.ctl.effort, lo, hi); }
+  log(`Nastavení: ${k} = ${cfg[k]}`); drawAll();
+});
+function setTarget(d) { cfg.target = clamp(cfg.target + d, 80, Math.min(200, cfg.hrMax - 2)); $('tVal').textContent = cfg.target; saveCfg(); if (run.ctl) run.ctl.ePrev = null; drawAll(); }
+$('tMinus').onclick = () => setTarget(-1);
+$('tPlus').onclick = () => setTarget(+1);
+let holdT = null;
+for (const [id, d] of [['tMinus',-1],['tPlus',1]]) {
+  $(id).addEventListener('pointerdown', () => { holdT = setTimeout(function rep(){ setTarget(d*5); holdT = setTimeout(rep, 400); }, 600); });
+  for (const ev of ['pointerup','pointerleave','pointercancel']) $(id).addEventListener(ev, () => clearTimeout(holdT));
+}
+
+// ---------- BLE ----------
+const RES = {1:'OK',2:'nepodporováno',3:'neplatná hodnota',4:'operace selhala',5:'pás nedal řízení'};
+function onCp(ev) {
+  const d = ev.target.value; if (d.getUint8(0) !== 0x80) return;
+  const op = d.getUint8(1), r = d.getUint8(2);
+  if (ble.pending && ble.pending.op === op) { const p = ble.pending; ble.pending = null; p.res(r); }
+}
+async function writeWait(bytes) {
+  const resp = new Promise(res => { ble.pending = { op: bytes[0], res }; setTimeout(() => { if (ble.pending && ble.pending.res === res) { ble.pending = null; res(null); } }, 3000); });
+  const buf = new Uint8Array(bytes);
+  if (ble.cp.writeValueWithResponse) await ble.cp.writeValueWithResponse(buf); else await ble.cp.writeValue(buf);
+  return resp;
+}
+function cpCmd(bytes, name) {
+  const job = cpQueue.then(async () => {
+    if (!ble.cp) return null;
+    let r = await writeWait(bytes);
+    if (r === 5 && bytes[0] !== 0) { await writeWait([0]); r = await writeWait(bytes); }
+    if (r === 1) log(`${name} ✓`); else log(`${name}: ${r == null ? 'bez odpovědi' : RES[r] || 'kód ' + r}`);
+    return r;
+  });
+  cpQueue = job.catch(e => log(`${name}: chyba – ${e.message}`));
+  return cpQueue;
+}
+function parseTD(dv) {
+  const f = dv.getUint16(0, true); let o = 2; const r = {};
+  try {
+    if (!(f & 1)) { r.v = dv.getUint16(o, true) / 100; o += 2; }
+    if (f & 2) o += 2;
+    if (f & 4) { r.dist = (dv.getUint16(o, true) + (dv.getUint8(o + 2) << 16)) / 1000; o += 3; }
+    if (f & 8) { r.i = dv.getInt16(o, true) / 10; o += 4; }
+    if (f & 16) o += 4;
+    if (f & 32) o += 1;
+    if (f & 64) o += 1;
+    if (f & 128) o += 5;
+    if ((f & 256) && o < dv.byteLength) { r.hr = dv.getUint8(o); o += 1; }
+  } catch (e) {}
+  return r;
+}
+function onTD(ev) {
+  const r = parseTD(ev.target.value), t = nowS();
+  if (r.v != null) tm.v = r.v;
+  if (r.i != null) tm.i = r.i;
+  if (r.dist != null) tm.dist = r.dist;
+  if (r.hr != null) { tm.hr = r.hr; tm.t = t; if (!(ext.hr && t - ext.t < 5) && r.hr > 30) pushHr(t, r.hr); }
+}
+function onHrm(ev) {
+  const d = ev.target.value, f = d.getUint8(0);
+  const hr = (f & 1) ? d.getUint16(1, true) : d.getUint8(1), t = nowS();
+  ext.hr = hr; ext.t = t; if (hr > 30) pushHr(t, hr);
+}
+function pushHr(t, hr) { samples.push({ t, hr }); if (samples.length > 120) samples.splice(0, samples.length - 120); }
+
+function btError(e) {
+  if (e && e.name === 'NotFoundError') { log('Výběr zařízení zrušen'); return; }
+  if (e && (e.name === 'SecurityError' || /permission|policy|allowed/i.test(e.message))) {
+    showMsg('Bluetooth je v tomto náhledu zablokovaný. Otevři soubor tempomat.html v Chrome na Android tabletu (na iPadu v prohlížeči Bluefy).'); }
+  else showMsg('Připojení selhalo: ' + (e && e.message || e));
+  log('Chyba: ' + (e && e.message || e));
+}
+function needBt() {
+  if (navigator.bluetooth) return true;
+  showMsg('Tento prohlížeč neumí Bluetooth. Na Android tabletu použij Chrome, na iPadu aplikaci Bluefy.');
+  return false;
+}
+async function connectTm(all) {
+  if (!needBt()) return;
+  try {
+    const opts = all ? { acceptAllDevices: true, optionalServices: [0x1826, 0x180d] } : { filters: [{ services: [0x1826] }], optionalServices: [0x180d] };
+    const dev = await navigator.bluetooth.requestDevice(opts);
+    ble.dev = dev; ble.wantConnected = true;
+    dev.addEventListener('gattserverdisconnected', onTmDisc);
+    await setupTm();
+    stopSim(); src = 'ble'; resetHistory();
+    showMsg('');
+  } catch (e) { btError(e); }
+}
+async function setupTm() {
+  const dev = ble.dev;
+  log(`Připojuji ${dev.name || 'pás'}…`);
+  const srv = await dev.gatt.connect();
+  let s;
+  try { s = await srv.getPrimaryService(0x1826); }
+  catch (e) { throw new Error('Zařízení nemá službu FTMS – tento pás asi používá jiný (proprietární) protokol.'); }
+  try { const d = await (await s.getCharacteristic(0x2ad4)).readValue(); ble.vRange = [d.getUint16(0,true)/100, d.getUint16(2,true)/100, (d.getUint16(4,true)/100) || 0.1]; } catch (e) {}
+  try { const d = await (await s.getCharacteristic(0x2ad5)).readValue(); ble.iRange = [d.getInt16(0,true)/10, d.getInt16(2,true)/10, (d.getUint16(4,true)/10) || 1]; } catch (e) {}
+  log(`Rozsah rychlosti ${ble.vRange[0]}–${ble.vRange[1]} km/h po ${ble.vRange[2]}, sklon ${ble.iRange[0]}–${ble.iRange[1]} % po ${ble.iRange[2]}`);
+  const td = await s.getCharacteristic(0x2acd);
+  td.addEventListener('characteristicvaluechanged', onTD); await td.startNotifications();
+  ble.cp = await s.getCharacteristic(0x2ad9);
+  ble.cp.addEventListener('characteristicvaluechanged', onCp); await ble.cp.startNotifications();
+  try { const hs = await srv.getPrimaryService(0x180d); const h = await hs.getCharacteristic(0x2a37); h.addEventListener('characteristicvaluechanged', onHrm); await h.startNotifications(); log('Pás posílá tep i přes službu Heart Rate'); } catch (e) {}
+  setChip('Tm', true, dev.name || 'Pás připojen');
+  await cpCmd([0x00], 'Převzetí řízení');
+  $('btnStart').disabled = false;
+}
+async function onTmDisc() {
+  setChip('Tm', false, 'Pás odpojen'); ble.cp = null; log('Spojení s pásem přerušeno');
+  if (run.on) showMsg('Spojení s pásem se přerušilo. Pás jede dál posledním nastavením – v případě potřeby ho zastav na pásu. Zkouším se znovu připojit…');
+  for (let k = 0; k < 4 && ble.wantConnected; k++) {
+    await new Promise(r => setTimeout(r, 2000 + k * 2000));
+    try { await setupTm(); showMsg(''); log('Znovu připojeno'); return; } catch (e) { log('Pokus o připojení selhal: ' + e.message); }
+  }
+}
+async function connectHr() {
+  if (!needBt()) return;
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [0x180d] }] });
+    dev.addEventListener('gattserverdisconnected', () => { setChip('Hr', false, 'Hrudní pás odpojen'); ext.hr = null; log('Hrudní pás odpojen'); });
+    const srv = await dev.gatt.connect();
+    const h = await (await srv.getPrimaryService(0x180d)).getCharacteristic(0x2a37);
+    h.addEventListener('characteristicvaluechanged', onHrm); await h.startNotifications();
+    ext.dev = dev; setChip('Hr', true, 'Tep: ' + (dev.name || 'hrudní pás'));
+    log('Hrudní pás připojen přímo'); showMsg('');
+  } catch (e) { btError(e); }
+}
+function setChip(which, on, txt) { $('chip'+which).classList.toggle('on', on); $('chip'+which+'Txt').textContent = txt; }
+
+// ---------- simulace ----------
+let simTimer = null;
+function startSim() {
+  ble.wantConnected = false;
+  sim = C.makeSim(Date.now() & 0xffff); simCmd = { v: 0, i: 0 }; src = 'sim';
+  ble.vRange = [0.5, 20, 0.1]; ble.iRange = [0, 15, 1];
+  setChip('Tm', true, 'Simulovaný pás'); setChip('Hr', true, 'Tep: simulace');
+  $('btnStart').disabled = false; resetHistory(); log('Simulace zapnuta'); showMsg('');
+}
+function stopSim() { sim = null; }
+
+// ---------- povely ----------
+function sendSpeed(v) {
+  if (src === 'sim') { simCmd.v = v; log(`Rychlost ${v.toFixed(1)} km/h ✓`); return; }
+  const x = Math.round(v * 100); cpCmd([0x02, x & 255, (x >> 8) & 255], `Rychlost ${v.toFixed(1)} km/h`);
+}
+function sendIncline(i) {
+  if (src === 'sim') { simCmd.i = i; log(`Sklon ${i} % ✓`); return; }
+  const x = Math.round(i * 10) & 0xffff; cpCmd([0x03, x & 255, (x >> 8) & 255], `Sklon ${i} %`);
+}
+function apply(cmd, force) {
+  const [vlo, vhi, vinc] = ble.vRange, [ilo, ihi, iinc] = ble.iRange, t = run.elapsed;
+  const vq = clamp(Math.round(cmd.v / vinc) * vinc, Math.max(vlo, 0.5), vhi);
+  const ls = run.lastSent || { v: -1, i: -99 };
+  if (force || Math.abs(vq - ls.v) >= vinc / 2) { sendSpeed(+vq.toFixed(2)); ls.v = vq; run.lastSentAt = t; }
+  // sklon: hystereze + nejvýš jedna změna za 20 s (motor sklonu je pomalý)
+  if (force || (Math.abs(cmd.i - ls.i) >= 0.75 * iinc && t - run.lastIncAt >= 20)) {
+    const iq = clamp(Math.round(cmd.i / iinc) * iinc, ilo, ihi);
+    if (force || Math.abs(iq - ls.i) >= iinc / 2) { sendIncline(+iq.toFixed(1)); ls.i = iq; run.lastIncAt = t; run.lastSentAt = t; }
+  }
+  run.lastSent = ls;
+}
+
+// ---------- běh ----------
+async function start() {
+  if (src === 'none') return;
+  if (run.on && run.paused) {
+    run.paused = false;
+    if (src === 'ble') await cpCmd([0x07], 'Pokračovat'); else simCmd.v = run.lastSent ? run.lastSent.v : cfg.vStart;
+    run.ctl.ePrev = null; ui(); return;
+  }
+  resetHistory();
+  run = { on:true, paused:false, elapsed:0, ctl:C.ctlInit(cfg, 0), lastCtl:0, msg:'Rozehřátí', lastSent:null, lastSentAt:0, lastIncAt:-99, overrideCnt:0, dist0:tm.dist };
+  if (src === 'ble') { await cpCmd([0x00], 'Převzetí řízení'); await cpCmd([0x07], 'Start'); }
+  apply(C.mapEffort(run.ctl.effort, cfg), true);
+  run.lastSent = { v: -1, i: -99 }; // po rozjezdu pás znovu pošle hodnoty (některé pásy po startu počítají 3 s)
+  try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  log('Trénink spuštěn'); ui();
+}
+async function pause() {
+  if (!run.on || run.paused) return;
+  run.paused = true;
+  if (src === 'ble') await cpCmd([0x08, 0x02], 'Pauza'); else simCmd.v = 0;
+  ui();
+}
+async function stop() {
+  if (src === 'ble') await cpCmd([0x08, 0x01], 'Stop'); else if (src === 'sim') { simCmd = { v: 0, i: 0 }; log('Stop ✓'); }
+  run.on = false; run.paused = false; run.msg = 'Zastaveno';
+  try { if (wake) await wake.release(); } catch (e) {} wake = null;
+  ui();
+}
+$('btnTm').onclick = () => connectTm(false);
+$('btnTmAll').onclick = () => connectTm(true);
+$('btnHr').onclick = connectHr;
+$('btnSim').onclick = startSim;
+$('btnStart').onclick = start;
+$('btnPause').onclick = pause;
+$('btnStop').onclick = stop;
+document.querySelectorAll('[data-man]').forEach(b => b.onclick = () => {
+  if (!run.on || !run.ctl) return;
+  const m = b.dataset.man, cur = run.lastSent && run.lastSent.v > 0 ? run.lastSent : C.mapEffort(run.ctl.effort, cfg);
+  let v = cur.v, i = cur.i;
+  if (m === 'v+') v += 0.5; if (m === 'v-') v -= 0.5; if (m === 'i+') i += 1; if (m === 'i-') i -= 1;
+  i = clamp(i, cfg.iBase, cfg.iMax);
+  if (cfg.mode === 'incline' && (m === 'v+' || m === 'v-')) { cfg.vStart = clamp(v, 1, cfg.vMax); $('s_vStart').value = cfg.vStart; saveCfg(); }
+  if (cfg.mode === 'speed' && (m === 'i+' || m === 'i-')) { cfg.iBase = i; $('s_iBase').value = i; saveCfg(); }
+  const [lo, hi] = C.effortRange(cfg);
+  run.ctl.effort = clamp(C.effortFrom(v, i, cfg), lo, hi); run.ctl.ePrev = null; run.lastIncAt = -99;
+  apply({ v: clamp(v, cfg.vMin, cfg.vMax), i }, false);
+  log(`Ruční zásah: ${v.toFixed(1)} km/h, ${i} %`);
+});
+
+function tick() {
+  const t = nowS();
+  if (src === 'sim' && sim) {
+    const hr = C.simTick(sim, simCmd.v, simCmd.i);
+    tm.v = +sim.v.toFixed(2); tm.i = Math.round(sim.i * 10) / 10; tm.dist = (tm.dist || 0) + sim.v / 3600;
+    pushHr(t, hr);
+  }
+  const est = C.estimate(samples, t);
+  run.est = est;
+  if (run.on && !run.paused) {
+    run.elapsed += 1;
+    // ruční změna na pásu → převzít jako nový stav
+    if (run.lastSent && run.lastSent.v > 0 && tm.v != null && run.elapsed - run.lastSentAt > 12 && Math.abs(tm.v - run.lastSent.v) > 0.35) {
+      if (++run.overrideCnt >= 6) {
+        const [lo, hi] = C.effortRange(cfg);
+        run.ctl.effort = clamp(C.effortFrom(tm.v, tm.i ?? cfg.iBase, cfg), lo, hi); run.ctl.ePrev = null;
+        run.lastSent = { v: tm.v, i: tm.i ?? run.lastSent.i }; run.overrideCnt = 0;
+        log(`Převzata ruční změna z pásu: ${tm.v} km/h`);
+      }
+    } else run.overrideCnt = 0;
+    if (run.elapsed - run.lastCtl >= C.DT) {
+      run.lastCtl = run.elapsed;
+      run.msg = C.ctlStep(run.ctl, cfg, est, run.elapsed);
+      run.cmd = C.mapEffort(run.ctl.effort, cfg);
+      apply(run.cmd, false);
+    }
+    hist.push({ t: run.elapsed, hr: est ? est.hr : null, target: cfg.target, v: tm.v, i: tm.i });
+    if (hist.length > 3 * 3600) hist.shift();
+  }
+  ui(); drawChart();
+}
+
+// ---------- UI ----------
+function fmtT(s) { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+function ui() {
+  const est = run.est;
+  const hrShow = est ? Math.round(est.hr) : null;
+  $('hrVal').textContent = hrShow ?? '–';
+  $('hrTrend').textContent = est ? (est.slope > 0.15 ? '▲ stoupá' : est.slope < -0.15 ? '▼ klesá' : '● stabilní') : ' ';
+  const pos = h => clamp((h - 90) / 100 * 100, 0, 100);
+  $('zBand').style.left = pos(cfg.target - 2) + '%'; $('zBand').style.width = (pos(cfg.target + 2) - pos(cfg.target - 2)) + '%';
+  $('zMax').style.width = (100 - pos(cfg.hrMax)) + '%';
+  $('zMark').hidden = hrShow == null; if (hrShow != null) $('zMark').style.left = pos(hrShow) + '%';
+  $('vVal').textContent = tm.v != null ? tm.v.toFixed(1).replace('.', ',') : '–';
+  $('iVal').textContent = tm.i != null ? String(tm.i).replace('.', ',') : '–';
+  const ls = run.lastSent && run.lastSent.v > 0 ? run.lastSent : null;
+  $('vCmd').textContent = 'povel ' + (ls ? ls.v.toFixed(1).replace('.', ',') : '–');
+  $('iCmd').textContent = 'povel ' + (ls && ls.i > -50 ? String(ls.i).replace('.', ',') : '–');
+  const d = tm.dist != null && run.dist0 != null ? tm.dist - run.dist0 : tm.dist;
+  $('dVal').textContent = d != null ? d.toFixed(2).replace('.', ',') : '–';
+  $('pVal').textContent = tm.v > 1 ? fmtT(3600 / tm.v) : '–';
+  const st = $('state');
+  st.textContent = run.paused ? 'Pauza' : run.on ? run.msg : (src === 'none' ? 'Připoj pás nebo spusť simulaci' : run.msg);
+  st.className = 'pill' + (/max|Bez|minimu/i.test(st.textContent) ? (/Nad max|zpomaluji/.test(st.textContent) ? ' bad' : ' warn') : run.on && !run.paused ? ' reg' : '');
+  $('clock').textContent = fmtT(run.elapsed);
+  $('btnStart').textContent = run.on && run.paused ? 'Pokračovat' : 'Start';
+  $('btnStart').disabled = src === 'none' || (run.on && !run.paused) || (src === 'ble' && !ble.cp);
+  $('btnPause').disabled = !run.on || run.paused;
+  $('btnStop').disabled = src === 'none';
+}
+
+// ---------- graf ----------
+const cv = $('chart'), cx = cv.getContext('2d');
+function tok(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function drawChart() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, r.width, r.height);
+  const W = r.width, H = r.height, L = 36, R = 40, T = 8, B = 22, pw = W - L - R, ph = H - T - B;
+  const span = Math.max(600, Math.min(1800, hist.length ? hist[hist.length - 1].t : 600));
+  const tEnd = hist.length ? Math.max(span, hist[hist.length - 1].t) : span, tStart = tEnd - span;
+  const X = t => L + (t - tStart) / span * pw;
+  const hrLo = 60, hrHi = 200, Y = h => T + (1 - (h - hrLo) / (hrHi - hrLo)) * ph;
+  const vHi = Math.max(14, Math.ceil(cfg.vMax + 2)), YV = v => T + (1 - v / vHi) * ph;
+  const YI = i => T + ph - (clamp(i, 0, 15) / 15) * ph * 0.35;
+  const muted = tok('--muted'), line = tok('--line');
+  cx.font = '11px ' + tok('--body'); cx.lineWidth = 1;
+  for (let h = 80; h <= 200; h += 20) { cx.strokeStyle = line; cx.beginPath(); cx.moveTo(L, Y(h)); cx.lineTo(W - R, Y(h)); cx.stroke(); cx.fillStyle = muted; cx.textAlign = 'right'; cx.fillText(h, L - 6, Y(h) + 4); }
+  cx.textAlign = 'left';
+  for (let v = 0; v <= vHi; v += vHi > 16 ? 4 : 2) cx.fillText(v, W - R + 6, YV(v) + 4);
+  cx.textAlign = 'center';
+  const step = span > 1200 ? 300 : 120;
+  for (let t = Math.ceil(tStart / step) * step; t <= tEnd; t += step) cx.fillText(Math.round(t / 60) + ' min', X(t), H - 6);
+  // cílové pásmo
+  const vis = hist.filter(p => p.t >= tStart);
+  cx.fillStyle = tok('--target') + '33';
+  cx.strokeStyle = tok('--target');
+  if (vis.length) {
+    cx.beginPath(); vis.forEach((p, k) => k ? cx.lineTo(X(p.t), Y(p.target + 2)) : cx.moveTo(X(p.t), Y(p.target + 2)));
+    for (let k = vis.length - 1; k >= 0; k--) cx.lineTo(X(vis[k].t), Y(vis[k].target - 2)); cx.closePath(); cx.fill();
+  } else { cx.fillRect(L, Y(cfg.target + 2), pw, Y(cfg.target - 2) - Y(cfg.target + 2)); }
+  // max tep
+  cx.setLineDash([4, 4]); cx.strokeStyle = tok('--hr'); cx.globalAlpha = .5; cx.beginPath(); cx.moveTo(L, Y(cfg.hrMax)); cx.lineTo(W - R, Y(cfg.hrMax)); cx.stroke(); cx.globalAlpha = 1; cx.setLineDash([]);
+  const path = (key, Yf, color, w) => { cx.strokeStyle = color; cx.lineWidth = w; cx.beginPath(); let pen = false; for (const p of vis) { if (p[key] == null) { pen = false; continue; } const x = X(p.t), y = Yf(p[key]); pen ? cx.lineTo(x, y) : cx.moveTo(x, y); pen = true; } cx.stroke(); };
+  path('i', YI, muted, 1.5);
+  path('v', YV, tok('--speed'), 2);
+  path('hr', Y, tok('--hr'), 2.5);
+  const lp = vis[vis.length - 1];
+  if (lp && lp.hr != null) { cx.fillStyle = tok('--hr'); cx.beginPath(); cx.arc(X(lp.t), Y(lp.hr), 4, 0, 7); cx.fill(); }
+  cx.lineWidth = 1;
+}
+function drawAll() { ui(); drawChart(); }
+window.addEventListener('resize', drawChart);
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', drawChart);
+new MutationObserver(drawChart).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- ukázka ----------
+function resetHistory() { hist = []; demo = false; $('demoTag').hidden = true; run.elapsed = 0; }
+function makeDemo() {
+  const c = { ...cfg, target: 145, mode: 'mix', response: 'stredni', warmup: 3 };
+  const s = C.makeSim(11), st = C.ctlInit(c, 0), smp = []; let cmd = C.mapEffort(st.effort, c);
+  for (let t = 0; t <= 14 * 60; t++) {
+    const hr = C.simTick(s, cmd.v, cmd.i); smp.push({ t, hr }); if (smp.length > 40) smp.shift();
+    const e = C.estimate(smp, t);
+    if (t % 5 === 0) { C.ctlStep(st, c, e, t); const q = C.mapEffort(st.effort, c); cmd = { v: Math.round(q.v * 10) / 10, i: Math.round(q.i) }; }
+    hist.push({ t, hr: e ? e.hr : null, target: c.target, v: s.v, i: s.i });
+  }
+}
+
+fillForm(); makeDemo();
+if (!navigator.bluetooth) showMsg('Tento prohlížeč neumí Bluetooth. Na Android tabletu otevři stránku v Chrome, na iPadu v aplikaci Bluefy. Simulaci si můžeš vyzkoušet i tady.');
+drawAll();
+setInterval(tick, 1000);
+log('Připraveno. Připoj pás, nebo spusť simulaci.');
+})();
+</script>
